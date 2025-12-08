@@ -42,15 +42,33 @@ jobs:
           # 关键修改：增加 --exclude=venv
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=venv
 
-      # 3. 只有上面的检查通过了，才会执行部署
-      - name: Upload to Deploy Server
+      # ---------------------------------------------------------
+      # 第一步：上传后端代码 (Python) 到原目录
+      # ---------------------------------------------------------
+      - name: Upload Backend (Python)
         uses: appleboy/scp-action@master
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USERNAME }}
           password: ${{ secrets.SERVER_PASSWORD }}
           port: ${{ secrets.SERVER_PORT }}
-          # 这里的 source 对应你实际的文件名
-          source: "./test.py, ./index.html"
+          # 只传 Python 文件和依赖
+          source: ./test.py
           target: '/home/ubuntu/test'
+          overwrite: true
+
+      # ---------------------------------------------------------
+      # 第二步：上传前端代码 (HTML) 到 Nginx 目录
+      # ---------------------------------------------------------
+      - name: Upload Frontend (HTML)
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT }}
+          # 只传 HTML 文件
+          source: "./index.html"
+          # 修改这里：填入你新的 HTML 存放位置
+          target: '/var/www/todo' 
           overwrite: true
