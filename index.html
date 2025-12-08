@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的待办事项 | To-Do List</title>
+    <!-- 引入 Tailwind CSS 进行美化 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入 FontAwesome 图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { background-color: #f3f4f6; }
+        .fade-in { animation: fadeIn 0.5s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        /* 弹窗动画 */
+        .modal-enter { animation: modalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body class="text-gray-800 min-h-screen flex flex-col items-center justify-center py-10 relative">
+
+    <div id="app" class="w-full max-w-md bg-white rounded-xl shadow-lg overflow-hidden fade-in relative z-10">
+        
+        <!-- 头部 -->
+        <div class="bg-indigo-600 p-6 text-center">
+            <h1 class="text-2xl font-bold text-white"><i class="fas fa-clipboard-check mr-2"></i>待办事项清单</h1>
+            <p class="text-indigo-200 text-sm mt-1">高效规划每一天</p>
+        </div>
+
+        <!-- 登录/注册表单区域 (未登录时显示) -->
+        <div id="auth-section" class="p-8">
+            <div class="flex justify-center mb-6 border-b">
+                <button onclick="switchTab('login')" id="tab-login" class="w-1/2 pb-2 border-b-2 border-indigo-600 font-semibold text-indigo-600 transition">登录</button>
+                <button onclick="switchTab('register')" id="tab-register" class="w-1/2 pb-2 border-b-2 border-transparent text-gray-500 hover:text-indigo-600 transition">注册</button>
+            </div>
+
+            <form id="auth-form" onsubmit="handleAuth(event)">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">用户名</label>
+                    <input type="text" id="username" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">密码</label>
+                    <input type="password" id="password" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                </div>
+                <button type="submit" id="auth-btn" class="w-full bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition duration-300">
+                    立即登录
+                </button>
+            </form>
+            <p id="auth-msg" class="text-center text-red-500 text-sm mt-4 hidden"></p>
+        </div>
+
+        <!-- 任务列表区域 (登录后显示) -->
+        <div id="todo-section" class="hidden flex flex-col h-[500px]">
+            <!-- 用户信息栏 -->
+            <div class="px-6 py-3 bg-indigo-50 border-b flex justify-between items-center">
+                <span class="text-sm text-indigo-800">你好, <span id="current-user" class="font-bold">User</span></span>
+                <button onclick="logout()" class="text-xs text-red-500 hover:text-red-700 underline">退出登录</button>
+            </div>
+
+            <!-- 任务列表 -->
+            <div id="task-list" class="flex-1 overflow-y-auto p-4 space-y-3">
+                <!-- 动态生成任务 -->
+            </div>
+
+            <!-- 添加任务栏 -->
+            <div class="p-4 bg-gray-50 border-t">
+                <form onsubmit="addTask(event)" class="flex gap-2">
+                    <input type="text" id="new-task" placeholder="添加新任务..." class="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition">
+                        <i class="fas fa-plus"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 自定义删除确认模态框 -->
+    <div id="delete-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 transition-opacity">
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-80 modal-enter text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                <i class="fas fa-exclamation-triangle text-red-600 text-xl"></i>
+            </div>
+            <h3 class="text-lg font-medium text-gray-900 mb-2">确认删除?</h3>
+            <p class="text-sm text-gray-500 mb-6">删除后任务将无法恢复，你确定要继续吗？</p>
+            <div class="flex gap-3 justify-center">
+                <button onclick="closeDeleteModal()" class="w-full bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition font-medium">取消</button>
+                <button onclick="executeDelete()" class="w-full bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-medium shadow-md">删除</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURATION
+        // 注意：如果你已经在 Windows Nginx 部署好了，记得将 USE_LOCAL_STORAGE 改为 false
+        const USE_LOCAL_STORAGE = false;
+        const API_BASE = '';
+
+        let isLoginMode = true;
+        let taskToDeleteId = null; // 用于存储待删除的任务ID
+
+        // --- Mock API (Local Storage implementation) ---
+        class MockApi {
+            constructor() {
+                this.delay = 100;
+                if (!localStorage.getItem('users')) localStorage.setItem('users', JSON.stringify([]));
+                if (!localStorage.getItem('tasks')) localStorage.setItem('tasks', JSON.stringify([]));
+            }
+
+            async _wait() { return new Promise(r => setTimeout(r, this.delay)); }
+
+            getUsers() { return JSON.parse(localStorage.getItem('users')); }
+            setUsers(users) { localStorage.setItem('users', JSON.stringify(users)); }
+            getTasks() { return JSON.parse(localStorage.getItem('tasks')); }
+            setTasks(tasks) { localStorage.setItem('tasks', JSON.stringify(tasks)); }
+
+            async login(username, password) {
+                await this._wait();
+                const users = this.getUsers();
+                const user = users.find(u => u.username === username && u.password === password);
+                if (user) {
+                    sessionStorage.setItem('currentUserId', user.id);
+                    sessionStorage.setItem('currentUsername', user.username);
+                    return { ok: true, data: { status: 'ok', username: user.username } };
+                }
+                return { ok: false, data: { error: 'Invalid credentials' } };
+            }
+
+            async register(username, password) {
+                await this._wait();
+                const users = this.getUsers();
+                if (users.find(u => u.username === username)) {
+                    return { ok: false, data: { error: 'User already exists' } };
+                }
+                const newUser = { id: Date.now(), username, password };
+                users.push(newUser);
+                this.setUsers(users);
+                return { ok: true, data: { status: 'ok' } };
+            }
+
+            async logout() {
+                await this._wait();
+                sessionStorage.removeItem('currentUserId');
+                sessionStorage.removeItem('currentUsername');
+                return { ok: true };
+            }
+
+            async getTaskList() {
+                await this._wait();
+                const uid = sessionStorage.getItem('currentUserId');
+                if (!uid) return { status: 401, ok: false };
+
+                const allTasks = this.getTasks();
+                const userTasks = allTasks
+                    .filter(t => t.user_id == uid)
+                    .sort((a, b) => b.id - a.id)
+                    .map(t => [t.id, t.title, t.created, t.done]);
+                
+                return { 
+                    ok: true, 
+                    data: { 
+                        tasks: userTasks, 
+                        username: sessionStorage.getItem('currentUsername') 
+                    } 
+                };
+            }
+
+            async addTask(title) {
+                await this._wait();
+                const uid = sessionStorage.getItem('currentUserId');
+                const tasks = this.getTasks();
+                tasks.push({
+                    id: Date.now(),
+                    title: title,
+                    created: new Date().toISOString(),
+                    done: 0,
+                    user_id: uid
+                });
+                this.setTasks(tasks);
+                return { ok: true };
+            }
+
+            async toggleTask(id) {
+                await this._wait();
+                const uid = sessionStorage.getItem('currentUserId');
+                const tasks = this.getTasks();
+                const task = tasks.find(t => t.id == id && t.user_id == uid);
+                if (task) {
+                    task.done = task.done ? 0 : 1;
+                    this.setTasks(tasks);
+                    return { ok: true };
+                }
+                return { ok: false };
+            }
+
+            async deleteTask(id) {
+                await this._wait();
+                const uid = sessionStorage.getItem('currentUserId');
+                let tasks = this.getTasks();
+                tasks = tasks.filter(t => !(t.id == id && t.user_id == uid));
+                this.setTasks(tasks);
+                return { ok: true };
+            }
+        }
+
+        // --- Real API implementation ---
+        class RealApi {
+            async login(u, p) { return this._fetch('/login', 'POST', { username: u, password: p }); }
+            async register(u, p) { return this._fetch('/register', 'POST', { username: u, password: p }); }
+            async logout() { return this._fetch('/logout', 'POST'); }
+            
+            async getTaskList() {
+                const res = await fetch(`${API_BASE}/tasks`, { credentials: 'include' });
+                if (res.status === 401) return { ok: false, status: 401 };
+                const data = await res.json();
+                return { ok: res.ok, data };
+            }
+
+            async addTask(title) { return this._fetch('/tasks', 'POST', { title }); }
+            async toggleTask(id) { return this._fetch(`/tasks/${id}/toggle`, 'PUT'); }
+            async deleteTask(id) { return this._fetch(`/tasks/${id}`, 'DELETE'); }
+
+            async _fetch(endpoint, method, body) {
+                try {
+                    const res = await fetch(`${API_BASE}${endpoint}`, {
+                        method,
+                        headers: { 'Content-Type': 'application/json' },
+                        body: body ? JSON.stringify(body) : undefined,
+                        credentials: 'include'
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    return { ok: res.ok, data, status: res.status };
+                } catch (e) {
+                    console.error("Network Error:", e);
+                    throw e;
+                }
+            }
+        }
+
+        const api = USE_LOCAL_STORAGE ? new MockApi() : new RealApi();
+
+        // --- Application Logic ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+            checkSession();
+        });
+
+        function switchTab(mode) {
+            isLoginMode = mode === 'login';
+            document.getElementById('tab-login').className = isLoginMode ? 'w-1/2 pb-2 border-b-2 border-indigo-600 font-semibold text-indigo-600 transition' : 'w-1/2 pb-2 border-b-2 border-transparent text-gray-500 transition';
+            document.getElementById('tab-register').className = !isLoginMode ? 'w-1/2 pb-2 border-b-2 border-indigo-600 font-semibold text-indigo-600 transition' : 'w-1/2 pb-2 border-b-2 border-transparent text-gray-500 transition';
+            document.getElementById('auth-btn').textContent = isLoginMode ? '立即登录' : '立即注册';
+            document.getElementById('auth-msg').classList.add('hidden');
+        }
+
+        async function handleAuth(e) {
+            e.preventDefault();
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            
+            try {
+                const res = isLoginMode ? await api.login(u, p) : await api.register(u, p);
+                
+                if (res.ok) {
+                    if (isLoginMode) {
+                        checkSession();
+                    } else {
+                        alert('注册成功，请登录！');
+                        switchTab('login');
+                    }
+                } else {
+                    showError(res.data.error || '操作失败');
+                }
+            } catch (err) {
+                showError('连接服务器失败');
+            }
+        }
+
+        async function checkSession() {
+            try {
+                const res = await api.getTaskList();
+                if (res.status === 401) {
+                    showAuth();
+                } else if (res.ok) {
+                    showTodo(res.data.username, res.data.tasks);
+                }
+            } catch (err) {
+                console.error(err);
+                if (!USE_LOCAL_STORAGE) showAuth();
+            }
+        }
+
+        async function logout() {
+            await api.logout();
+            showAuth();
+        }
+
+        async function addTask(e) {
+            e.preventDefault();
+            const input = document.getElementById('new-task');
+            if (!input.value.trim()) return;
+            await api.addTask(input.value);
+            input.value = '';
+            checkSession();
+        }
+
+        async function toggleTask(id) {
+            await api.toggleTask(id);
+            checkSession();
+        }
+
+        // --- 新增：处理删除弹窗逻辑 ---
+        
+        function confirmDelete(id) {
+            taskToDeleteId = id; // 保存要删除的ID
+            document.getElementById('delete-modal').classList.remove('hidden'); // 显示模态框
+        }
+
+        function closeDeleteModal() {
+            taskToDeleteId = null;
+            document.getElementById('delete-modal').classList.add('hidden'); // 隐藏模态框
+        }
+
+        async function executeDelete() {
+            if (taskToDeleteId) {
+                await api.deleteTask(taskToDeleteId);
+                closeDeleteModal();
+                checkSession();
+            }
+        }
+
+        // --- UI Rendering ---
+
+        function showAuth() {
+            document.getElementById('auth-section').classList.remove('hidden');
+            document.getElementById('todo-section').classList.add('hidden');
+        }
+
+        function showTodo(username, tasks) {
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('todo-section').classList.remove('hidden');
+            document.getElementById('current-user').textContent = username || 'User';
+            
+            const list = document.getElementById('task-list');
+            list.innerHTML = '';
+            
+            if (!tasks || tasks.length === 0) {
+                list.innerHTML = `<div class="text-center text-gray-400 mt-10"><i class="fas fa-mug-hot text-4xl mb-3"></i><p>所有任务已完成！</p></div>`;
+                return;
+            }
+
+            tasks.forEach(t => {
+                const [id, title, date, done] = t;
+                const item = document.createElement('div');
+                item.className = `flex items-center justify-between p-3 bg-white rounded-lg shadow-sm border-l-4 ${done ? 'border-green-400 bg-gray-50' : 'border-indigo-500'} transition hover:shadow-md`;
+                item.innerHTML = `
+                    <div class="flex items-center flex-1 cursor-pointer" onclick="toggleTask(${id})">
+                        <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center mr-3 ${done ? 'border-green-500 bg-green-500 text-white' : 'border-gray-300 text-transparent'}">
+                            <i class="fas fa-check text-xs"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-sm font-medium ${done ? 'line-through text-gray-400' : 'text-gray-800'}">${title}</span>
+                            <span class="text-xs text-gray-400">${date.split('T')[0]}</span>
+                        </div>
+                    </div>
+                    <!-- 注意：这里改成了调用 confirmDelete -->
+                    <button onclick="confirmDelete(${id})" class="text-gray-300 hover:text-red-500 p-2 transition">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                `;
+                list.appendChild(item);
+            });
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('auth-msg');
+            el.textContent = msg;
+            el.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
