@@ -1,0 +1,74 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. 拉取代码
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+
+      # =========================================================
+      # 新增步骤：设置 Python 环境
+      # =========================================================
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9' # 建议与你服务器上的 Python 版本保持一致
+
+      # =========================================================
+      # 新增步骤：安装依赖并运行静态检查
+      # =========================================================
+      - name: Install dependencies and Lint
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8
+          # 如果你有 requirements.txt，也可以在这里安装，确保依赖没问题
+          # pip install -r requirements.txt 
+          
+          # 运行 Flake8 检查
+          # E9,F63,F7,F82 代表语法错误和未定义的变量等严重错误
+          # 关键修改：增加 --exclude=venv，忽略虚拟环境目录
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=venv
+          
+          # (可选) 检查代码风格
+          # 关键修改：增加 --exclude=venv
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=venv
+
+      # ---------------------------------------------------------
+      # 第一步：上传后端代码 (Python) 到原目录
+      # ---------------------------------------------------------
+      - name: Upload Backend (Python)
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT }}
+          # 只传 Python 文件和依赖
+          source: ./test.py
+          target: '/home/ubuntu/test'
+          overwrite: true
+
+      # ---------------------------------------------------------
+      # 第二步：上传前端代码 (HTML) 到 Nginx 目录
+      # ---------------------------------------------------------
+      - name: Upload Frontend (HTML)
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT }}
+          # 只传 HTML 文件
+          source: "./index.html"
+          # 修改这里：填入你新的 HTML 存放位置
+          target: '/var/www/todo' 
+          overwrite: true
