@@ -3,10 +3,16 @@ from flask_cors import CORS
 from datetime import datetime
 import sqlite3
 from functools import wraps
+import os
 
 DB_NAME = "todo.db"
 app = Flask(__name__)
 app.secret_key = "9f4c8a1e3b7d4a92c6f0e5b8a1d73c24e6f9b0a4c8d12e5f7a93b6d0e41c82"
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_NAME = os.path.join(BASE_DIR, DB_NAME)
+
+
 
 # ---------------------- CORS SETTINGS ----------------------
 # 允许跨域请求，并允许携带凭证(Cookie)
@@ -40,6 +46,9 @@ def init_db():
 
 def get_db():
     return sqlite3.connect(DB_NAME)
+
+if not os.path.exists(DB_NAME):
+    init_db()
 
 # ---------------------- Auth Decorator ----------------------
 def login_required(f):
