@@ -88,7 +88,7 @@ def login():
         session['username'] = username
         return jsonify({'status': 'ok', 'username': username})
     
-    return jsonify({'error': '用户名或密码错误！'}), 401
+    return jsonify({'error': '用户名或密码有错误！'}), 401
 
 @app.route('/logout', methods=['POST'])
 def logout():
