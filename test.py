@@ -6,7 +6,7 @@ from functools import wraps
 
 DB_NAME = "todo.db"
 app = Flask(__name__)
-app.secret_key = "your-very-secret-key-change-this"
+app.secret_key = "9f4c8a1e3b7d4a92c6f0e5b8a1d73c24e6f9b0a4c8d12e5f7a93b6d0e41c82"
 
 # ---------------------- CORS SETTINGS ----------------------
 # 允许跨域请求，并允许携带凭证(Cookie)
