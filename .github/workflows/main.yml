@@ -21,7 +21,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9' # 建议与你服务器上的 Python 版本保持一致
+          python-version: '3.9' 
 
       # =========================================================
       # 新增步骤：安装依赖并运行静态检查
@@ -36,7 +36,7 @@ jobs:
           # 关键修改：增加 --exclude=venv，忽略虚拟环境目录
           flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=venv
           
-          # (可选) 检查代码风格
+          # 检查代码风格
           # 关键修改：增加 --exclude=venv
           flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=venv
 
@@ -67,7 +67,6 @@ jobs:
           port: ${{ secrets.SERVER_PORT }}
           # 只传 HTML 文件
           source: "./index.html"
-          # 修改这里：填入你新的 HTML 存放位置
           target: '/var/www/todo' 
           overwrite: true
 
@@ -92,7 +91,6 @@ jobs:
             fi
             
             # 2. 安装依赖 (强制使用虚拟环境的 pip)
-            # 显式安装 gunicorn，防止遗漏
             echo "Installing dependencies..."
             ./venv/bin/pip install flask flask-cors gunicorn
             
@@ -101,7 +99,6 @@ jobs:
             ps -ef | grep "gunicorn" | grep "test:app" | grep -v "grep" | awk '{print $2}' | xargs -r kill || true
             
             # 4. 启动新服务 (使用虚拟环境的 gunicorn)
-            # 注意：入口是 test:app (文件名:变量名)
             echo "Starting Gunicorn..."
             nohup ./venv/bin/gunicorn -w 4 -b 127.0.0.1:8000 test:app > flask.log 2>&1 &
             echo "Deploy Finished!"
