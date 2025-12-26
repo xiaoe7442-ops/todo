@@ -98,7 +98,7 @@ jobs:
             
             # 3. 杀掉旧进程
             echo "Stopping old processes..."
-            pkill -f gunicorn || true
+            ps -ef | grep "gunicorn" | grep "test:app" | grep -v "grep" | awk '{print $2}' | xargs -r kill || true
             
             # 4. 启动新服务 (使用虚拟环境的 gunicorn)
             # 注意：入口是 test:app (文件名:变量名)
