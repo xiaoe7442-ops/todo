@@ -164,7 +164,7 @@ def toggle_task(task_id):
 @login_required
 def delete_task(task_id):
     uid = session['user_id']
-    conn = get_db(); c = conn.cursor()
+    conn = get_db(); c = conn.cursor(
     c.execute("DELETE FROM tasks WHERE id=? AND user_id=?", (task_id, uid))
     conn.commit()
     conn.close()
