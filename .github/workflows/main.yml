@@ -70,3 +70,38 @@ jobs:
           # 修改这里：填入你新的 HTML 存放位置
           target: '/var/www/todo' 
           overwrite: true
+
+      
+      # ---------------------------------------------------------
+      # 第三步：通过 SSH 在远程服务器上执行命令
+      # ---------------------------------------------------------
+      - name: SSH Remote Commands
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          password: ${{ secrets.SERVER_PASSWORD }}
+          port: ${{ secrets.SERVER_PORT }}
+          script: |
+            cd /home/ubuntu/test
+            
+            # 1. 如果虚拟环境不存在，自动创建
+            if [ ! -d "venv" ]; then
+              echo "Creating virtual environment..."
+              python3 -m venv venv
+            fi
+            
+            # 2. 安装依赖 (强制使用虚拟环境的 pip)
+            # 显式安装 gunicorn，防止遗漏
+            echo "Installing dependencies..."
+            ./venv/bin/pip install flask flask-cors gunicorn
+            
+            # 3. 杀掉旧进程
+            echo "Stopping old processes..."
+            pkill -f gunicorn || true
+            
+            # 4. 启动新服务 (使用虚拟环境的 gunicorn)
+            # 注意：入口是 test:app (文件名:变量名)
+            echo "Starting Gunicorn..."
+            nohup ./venv/bin/gunicorn -w 4 -b 127.0.0.1:8000 test:app > flask.log 2>&1 &
+            echo "Deploy Finished!"
